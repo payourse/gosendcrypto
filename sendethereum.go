@@ -1,0 +1,164 @@
+package gosendcrypto
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"errors"
+	"math"
+	"math/big"
+
+	"github.com/payourse/gosendcrypto/erc20"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
+)
+
+func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, value float64) (*Result, error) {
+	client, err := ethclient.Dial(cfg.gateway)
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := crypto.ToECDSA(common.FromHex(privKey))
+	if err != nil {
+		return nil, err
+	}
+
+	fromAddress := crypto.PubkeyToAddress(pk.PublicKey)
+	toAddress := common.HexToAddress(to)
+	gasLimit := uint64(21000)
+
+	balance, err := client.BalanceAt(ctx, fromAddress, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	amount := big.NewInt(int64(value * params.Ether))
+
+	networkID, err := client.NetworkID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := cfg.nonce
+	if nonce == 0 {
+		nonce, err = client.NonceAt(ctx, fromAddress, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	feeCap, err := client.SuggestGasPrice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tip, err := client.SuggestGasTipCap(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var tx *types.Transaction
+
+	if cfg.contractAddr != "" {
+		tx, err = senderc20Token(
+			client,
+			pk,
+			common.HexToAddress(cfg.contractAddr),
+			fromAddress,
+			toAddress,
+			networkID,
+			tip,
+			feeCap,
+			value,
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		tx = types.NewTx(&types.DynamicFeeTx{
+			ChainID:   networkID,
+			Nonce:     nonce,
+			GasFeeCap: feeCap,
+			GasTipCap: tip,
+			Gas:       gasLimit,
+			To:        &toAddress,
+			Value:     amount,
+			Data:      []byte{},
+		})
+		tx, err = types.SignTx(tx, types.LatestSignerForChainID(networkID), pk)
+		if err != nil {
+			return nil, err
+		}
+		if balance.Cmp(amount) != 1 {
+			return nil, errors.New("amount should be less than balance")
+		}
+
+		err = client.SendTransaction(ctx, tx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if cfg.awaitConfirmation {
+		_, err := bind.WaitMined(ctx, client, tx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result := &Result{
+		TxHash: tx.Hash().Hex(),
+		Nonce:  nonce,
+	}
+	return result, nil
+
+}
+
+func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contractAddr, fromAddr, toAddr common.Address, networkID, tip, feeCap *big.Int, value float64) (*types.Transaction, error) {
+	auth, err := bind.NewKeyedTransactorWithChainID(privKey, networkID)
+	if err != nil {
+		return nil, err
+	}
+
+	callOpts := &bind.CallOpts{
+		Pending: false,
+		From:    fromAddr,
+	}
+
+	contract, err := erc20.NewErc20(contractAddr, client)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := contract.BalanceOf(callOpts, fromAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	decimals, err := contract.Decimals(callOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	amount := big.NewInt(int64(value * math.Pow10(int(decimals))))
+
+	if balance.Cmp(amount) == -1 {
+		return nil, errors.New("value should be equal or greater than balance")
+	}
+
+	auth.GasTipCap = tip
+	auth.GasFeeCap = feeCap
+	auth.From = fromAddr
+
+	tx, err := contract.Transfer(auth, toAddr, amount)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
