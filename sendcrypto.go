@@ -40,18 +40,17 @@ var addrPrefixNetwork = map[string]string{
 	"tb1": string(Blockchain.Bitcoin) + string(Network.Testnet),
 }
 
-var senders = map[blockchain]func(ctx context.Context, cfg *CryptoSender, privKey, to string, amount float64) (*Result, error){
+var senders = map[blockchain]func(ctx context.Context, cfg *CryptoSender, privKey, to string, amount float64, addrValues ...*SendToManyObj) (*Result, error){
 	Blockchain.Ethereum: sendEthereum,
 	Blockchain.Bitcoin:  sendBitcoin,
 	Blockchain.Tron:     sendTron,
 }
 
-func NewCryptoSender(blockchain blockchain, network network, contractAddr, gatewayURL string) *CryptoSender {
+func NewCryptoSender(blockchain blockchain, network network, gatewayURL string) *CryptoSender {
 	return &CryptoSender{
-		blockchain:   blockchain,
-		network:      network,
-		gateway:      gatewayURL,
-		contractAddr: contractAddr,
+		blockchain: blockchain,
+		network:    network,
+		gateway:    gatewayURL,
 	}
 }
 
@@ -60,6 +59,27 @@ type Result struct {
 	TxPosition int
 	Nonce      uint64
 	Balance    float64
+}
+
+type SendToManyResult struct {
+	Success []*sendToManyResObj
+	Failed  []*sendToManyResObj
+}
+
+type sendToManyResObj struct {
+	Address    string
+	Amount     float64
+	TxHash     string
+	TxPosition int
+	Nonce      uint64
+	Balance    float64
+	err        error
+}
+
+type SendToManyObj struct {
+	Address         string
+	Amount          float64
+	TerminateOnFail bool
 }
 
 type CryptoSender struct {
@@ -99,6 +119,10 @@ func (c *CryptoSender) SetAwaitConfirmation(wait bool) *CryptoSender {
 	c.awaitConfirmation = wait
 	return c
 }
+func (c *CryptoSender) SetContractAddress(contractAddr string) *CryptoSender {
+	c.contractAddr = contractAddr
+	return c
+}
 
 func (c *CryptoSender) Sendcrypto(ctx context.Context, privateKey, toAddress string, amount float64) (res *Result, err error) {
 	net := ""
@@ -117,13 +141,81 @@ func (c *CryptoSender) Sendcrypto(ctx context.Context, privateKey, toAddress str
 		return nil, errors.New("invalid network or toAddress")
 	}
 
-	// chain := c.contractAddr
-
-	// if c.blockchain == Blockchain.Bitcoin {
-	// 	chain = string(c.network)
-	// }
-
 	sender := senders[c.blockchain]
 	res, err = sender(ctx, c, privateKey, toAddress, amount)
+	return
+}
+
+func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrValues []*SendToManyObj) (res *SendToManyResult, err error) {
+	if len(addrValues) < 1 {
+		return nil, errors.New("invalid addrValues length")
+	}
+	toAddress := addrValues[0].Address
+	net := ""
+	prefix := ""
+	for prefix := range addrPrefixNetwork {
+		if strings.HasPrefix(toAddress, prefix) {
+			net = addrPrefixNetwork[prefix]
+		}
+	}
+
+	networkCheck := string(c.blockchain)
+	if c.blockchain == Blockchain.Bitcoin {
+		networkCheck += string(c.network)
+	}
+
+	if net != networkCheck {
+		return nil, errors.New("invalid network or toAddress")
+	}
+
+	sender := senders[c.blockchain]
+	res = &SendToManyResult{
+		Success: []*sendToManyResObj{},
+		Failed:  []*sendToManyResObj{},
+	}
+	if c.blockchain == Blockchain.Bitcoin {
+		result, err := sender(ctx, c, privateKey, "", 0, addrValues...)
+		if err != nil {
+			return res, err
+		}
+		resList := []*sendToManyResObj{}
+		for n, addrVal := range addrValues {
+			if !strings.HasPrefix(addrVal.Address, prefix) {
+				return nil, errors.New("invalid address found: " + addrVal.Address)
+			}
+			resList = append(resList, &sendToManyResObj{
+				Address:    addrVal.Address,
+				Amount:     addrVal.Amount,
+				TxPosition: n + 1,
+				TxHash:     result.TxHash,
+			})
+		}
+		res.Success = resList
+	} else {
+		nonce := c.nonce
+		for _, addrVal := range addrValues {
+			c.nonce = nonce
+			result, err := sender(ctx, c, privateKey, addrVal.Address, addrVal.Amount)
+			if err != nil {
+				res.Failed = append(res.Failed, &sendToManyResObj{
+					Address: addrVal.Address,
+					Amount:  addrVal.Amount,
+					err:     err,
+				})
+				if addrVal.TerminateOnFail {
+					return res, err
+				}
+
+			}
+			res.Success = append(res.Success, &sendToManyResObj{
+				Address: addrVal.Address,
+				Amount:  addrVal.Amount,
+				Nonce:   result.Nonce,
+				TxHash:  result.TxHash,
+			})
+			nonce = result.Nonce + 1
+		}
+	}
+
 	return
 }

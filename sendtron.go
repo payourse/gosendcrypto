@@ -14,12 +14,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func sendTron(ctx context.Context, cfg *CryptoSender, privKey, to string, amount float64) (*Result, error) {
+func sendTron(ctx context.Context, cfg *CryptoSender, privKey, to string, amount float64, addrValues ...*SendToManyObj) (*Result, error) {
 	client, err := client.NewGrpcClient(cfg.gateway, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
-	err = client.SetAPIKey("09521cb7-d4c0-4bc9-b42b-27fb7d9c684e")
+	err = client.SetAPIKey(cfg.apiKey)
 	if err != nil {
 		return nil, err
 	}

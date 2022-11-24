@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, value float64) (*Result, error) {
+func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, value float64, addrValues ...*SendToManyObj) (*Result, error) {
 	client, err := ethclient.Dial(cfg.gateway)
 	if err != nil {
 		return nil, err
