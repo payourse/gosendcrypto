@@ -6,23 +6,23 @@ import (
 	"strings"
 )
 
-type blockchain string
+type BlockchainEnum string
 
 var Blockchain = struct {
-	Ethereum blockchain
-	Tron     blockchain
-	Bitcoin  blockchain
+	Ethereum BlockchainEnum
+	Tron     BlockchainEnum
+	Bitcoin  BlockchainEnum
 }{
 	Ethereum: "ethereum",
 	Tron:     "tron",
 	Bitcoin:  "bitcoin",
 }
 
-type network string
+type NetworkEnum string
 
 var Network = struct {
-	Testnet network
-	Mainnet network
+	Testnet NetworkEnum
+	Mainnet NetworkEnum
 }{
 	Testnet: "testnet",
 	Mainnet: "",
@@ -40,13 +40,13 @@ var addrPrefixNetwork = map[string]string{
 	"tb1": string(Blockchain.Bitcoin) + string(Network.Testnet),
 }
 
-var senders = map[blockchain]func(ctx context.Context, cfg *CryptoSender, privKey, to string, amount float64, addrValues ...*SendToManyObj) (*Result, error){
+var senders = map[BlockchainEnum]func(ctx context.Context, cfg *CryptoSender, privKey, to string, amount float64, addrValues ...*SendToManyObj) (*Result, error){
 	Blockchain.Ethereum: sendEthereum,
 	Blockchain.Bitcoin:  sendBitcoin,
 	Blockchain.Tron:     sendTron,
 }
 
-func NewCryptoSender(blockchain blockchain, network network, gatewayURL string) *CryptoSender {
+func NewCryptoSender(blockchain BlockchainEnum, network NetworkEnum, gatewayURL string) *CryptoSender {
 	return &CryptoSender{
 		blockchain: blockchain,
 		network:    network,
@@ -83,8 +83,8 @@ type SendToManyObj struct {
 }
 
 type CryptoSender struct {
-	blockchain        blockchain
-	network           network
+	blockchain        BlockchainEnum
+	network           NetworkEnum
 	gateway           string
 	contractAddr      string
 	apiKey            string
