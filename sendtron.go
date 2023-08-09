@@ -57,7 +57,12 @@ func sendTron(ctx context.Context, cfg *CryptoSender, privKey, to string, amount
 		}
 		txHash = tx.TransactionHash[2:]
 	} else {
-		txEx, err := client.Transfer(ks.Address.String(), to, int64(amount*math.Pow10(6)))
+		amountFloat := new(big.Float).Mul(big.NewFloat(amount), big.NewFloat(math.Pow10(6)))
+		amount, ok := new(big.Int).SetString(amountFloat.Text('f', 0), 10)
+		if !ok {
+			return nil, errors.New("error converting trx value to unit value")
+		}
+		txEx, err := client.Transfer(ks.Address.String(), to, amount.Int64())
 		if err != nil {
 			return nil, err
 		}
