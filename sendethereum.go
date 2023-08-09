@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"math"
 	"math/big"
 
 	"github.com/payourse/gosendcrypto/erc20"
@@ -37,7 +36,13 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 		return nil, err
 	}
 
-	amount := big.NewInt(int64(value * params.Ether))
+	// amount := big.NewInt(int64(value * params.Ether))
+	amountFloat := new(big.Float).Mul(big.NewFloat(value), big.NewFloat(params.Ether))
+	amount, ok := new(big.Int).SetString(amountFloat.Text('f', 0), 10)
+
+	if !ok {
+		return nil, errors.New("error converting value to ether")
+	}
 
 	networkID, err := client.NetworkID(ctx)
 	if err != nil {
@@ -145,7 +150,13 @@ func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contrac
 		return nil, err
 	}
 
-	amount := big.NewInt(int64(value * math.Pow10(int(decimals))))
+	// amount := big.NewInt(int64(value * math.Pow10(int(decimals))))
+	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
+	amountFloat := new(big.Float).Mul(big.NewFloat(value), new(big.Float).SetInt(multiplier))
+	amount, ok := new(big.Int).SetString(amountFloat.Text('f', 0), 10)
+	if !ok {
+		return nil, errors.New("error converting value to unit")
+	}
 
 	if balance.Cmp(amount) == -1 {
 		return nil, errors.New("value should be equal or greater than balance")
