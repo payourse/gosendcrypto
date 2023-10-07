@@ -205,7 +205,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				if addrVal.TerminateOnFail {
 					return res, err
 				}
-
+				continue
 			}
 			res.Success = append(res.Success, &sendToManyResObj{
 				Address: addrVal.Address,
