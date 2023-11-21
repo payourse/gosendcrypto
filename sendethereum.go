@@ -81,6 +81,7 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 			networkID,
 			tip,
 			feeCap,
+			big.NewInt(int64(nonce)),
 			value,
 		)
 		if err != nil {
@@ -135,7 +136,7 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 
 }
 
-func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contractAddr, fromAddr, toAddr common.Address, networkID, tip, feeCap *big.Int, value float64) (*types.Transaction, error) {
+func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contractAddr, fromAddr, toAddr common.Address, networkID, tip, feeCap, nonce *big.Int, value float64) (*types.Transaction, error) {
 	auth, err := bind.NewKeyedTransactorWithChainID(privKey, networkID)
 	if err != nil {
 		return nil, err
@@ -181,6 +182,7 @@ func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contrac
 	auth.GasTipCap = tip
 	auth.GasFeeCap = feeCap2
 	auth.From = fromAddr
+	auth.Nonce = nonce
 
 	tx, err := contract.Transfer(auth, toAddr, amount)
 	if err != nil {
@@ -188,7 +190,7 @@ func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contrac
 		return nil, err
 	}
 
-	fmt.Println("erc20 transfer tx hash:", tx.Hash().Hex(), tx.Nonce(), tx.GasFeeCap().String(), tx.GasTipCap().String())
+	fmt.Println("nonce", tx.Nonce(), "feecap", tx.GasFeeCap().String(), "tip", tx.GasTipCap().String())
 
 	return tx, nil
 }
