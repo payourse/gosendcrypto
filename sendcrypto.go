@@ -75,6 +75,7 @@ type sendToManyResObj struct {
 	Nonce      uint64
 	Balance    float64
 	Err        error
+	TxData     string
 }
 
 type SendToManyObj struct {
@@ -213,6 +214,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				Amount:  addrVal.Amount,
 				Nonce:   result.Nonce,
 				TxHash:  result.TxHash,
+				TxData:  result.Data,
 			})
 			nonce = result.Nonce + 1
 		}
