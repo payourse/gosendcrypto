@@ -184,8 +184,11 @@ func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contrac
 
 	tx, err := contract.Transfer(auth, toAddr, amount)
 	if err != nil {
+		fmt.Println("erc20 transfer err:", err)
 		return nil, err
 	}
+
+	fmt.Println("erc20 transfer tx hash:", tx.Hash().Hex(), tx.Nonce(), tx.GasFeeCap().String(), tx.GasTipCap().String())
 
 	return tx, nil
 }
