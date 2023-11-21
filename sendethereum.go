@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/payourse/gosendcrypto/erc20"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -116,9 +118,18 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 		}
 	}
 
+	dataStr := ""
+	data, err := tx.MarshalBinary()
+	if err != nil {
+		fmt.Println("tx marshal error for", tx.Hash().Hex(), err.Error())
+	} else {
+		dataStr = hexutil.Encode(data)
+	}
+
 	result := &Result{
 		TxHash: tx.Hash().Hex(),
 		Nonce:  nonce,
+		Data:   dataStr,
 	}
 	return result, nil
 
@@ -162,8 +173,13 @@ func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contrac
 		return nil, errors.New("value should be equal or greater than balance")
 	}
 
+	if tip.String() == "0" {
+		tip = new(big.Int).Add(tip, big.NewInt(1_000_000_000))
+	}
+
+	feeCap2 := new(big.Int).Mul(feeCap, big.NewInt(2))
 	auth.GasTipCap = tip
-	auth.GasFeeCap = feeCap
+	auth.GasFeeCap = feeCap2
 	auth.From = fromAddr
 
 	tx, err := contract.Transfer(auth, toAddr, amount)

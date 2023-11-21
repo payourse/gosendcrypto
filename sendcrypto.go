@@ -59,6 +59,7 @@ type Result struct {
 	TxPosition int
 	Nonce      uint64
 	Balance    float64
+	Data       string
 }
 
 type SendToManyResult struct {
@@ -73,7 +74,7 @@ type sendToManyResObj struct {
 	TxPosition int
 	Nonce      uint64
 	Balance    float64
-	err        error
+	Err        error
 }
 
 type SendToManyObj struct {
@@ -200,7 +201,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				res.Failed = append(res.Failed, &sendToManyResObj{
 					Address: addrVal.Address,
 					Amount:  addrVal.Amount,
-					err:     err,
+					Err:     err,
 				})
 				if addrVal.TerminateOnFail {
 					return res, err
