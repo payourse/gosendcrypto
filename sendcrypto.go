@@ -95,6 +95,7 @@ type CryptoSender struct {
 	balance           float64
 	nonce             uint64
 	awaitConfirmation bool
+	tipBoost          float64
 }
 
 func (c *CryptoSender) SetAPIKey(apiKey string) *CryptoSender {
@@ -115,6 +116,10 @@ func (c *CryptoSender) SetBalance(balance float64) *CryptoSender {
 }
 func (c *CryptoSender) SetNonce(nonce uint64) *CryptoSender {
 	c.nonce = nonce
+	return c
+}
+func (c *CryptoSender) SetTipBoost(tipBoost float64) *CryptoSender {
+	c.tipBoost = tipBoost
 	return c
 }
 func (c *CryptoSender) SetAwaitConfirmation(wait bool) *CryptoSender {

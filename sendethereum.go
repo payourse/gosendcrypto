@@ -68,6 +68,9 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 	if err != nil {
 		return nil, err
 	}
+	if cfg.tipBoost > 0 {
+		tip = new(big.Int).Add(tip, big.NewInt(int64(cfg.tipBoost*float64(tip.Int64()))))
+	}
 
 	var tx *types.Transaction
 
