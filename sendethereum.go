@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/payourse/gosendcrypto/erc20"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -66,6 +68,9 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 	if err != nil {
 		return nil, err
 	}
+	if cfg.tipBoost > 0 {
+		tip = new(big.Int).Add(tip, big.NewInt(int64(cfg.tipBoost*float64(tip.Int64()))))
+	}
 
 	var tx *types.Transaction
 
@@ -79,6 +84,7 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 			networkID,
 			tip,
 			feeCap,
+			big.NewInt(int64(nonce)),
 			value,
 		)
 		if err != nil {
@@ -116,15 +122,24 @@ func sendEthereum(ctx context.Context, cfg *CryptoSender, privKey, to string, va
 		}
 	}
 
+	dataStr := ""
+	data, err := tx.MarshalBinary()
+	if err != nil {
+		fmt.Println("tx marshal error for", tx.Hash().Hex(), err.Error())
+	} else {
+		dataStr = hexutil.Encode(data)
+	}
+
 	result := &Result{
 		TxHash: tx.Hash().Hex(),
 		Nonce:  nonce,
+		Data:   dataStr,
 	}
 	return result, nil
 
 }
 
-func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contractAddr, fromAddr, toAddr common.Address, networkID, tip, feeCap *big.Int, value float64) (*types.Transaction, error) {
+func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contractAddr, fromAddr, toAddr common.Address, networkID, tip, feeCap, nonce *big.Int, value float64) (*types.Transaction, error) {
 	auth, err := bind.NewKeyedTransactorWithChainID(privKey, networkID)
 	if err != nil {
 		return nil, err
@@ -162,14 +177,23 @@ func senderc20Token(client *ethclient.Client, privKey *ecdsa.PrivateKey, contrac
 		return nil, errors.New("value should be equal or greater than balance")
 	}
 
+	if tip.String() == "0" {
+		tip = new(big.Int).Add(tip, big.NewInt(1_000_000_000))
+	}
+
+	feeCap2 := new(big.Int).Mul(feeCap, big.NewInt(2))
 	auth.GasTipCap = tip
-	auth.GasFeeCap = feeCap
+	auth.GasFeeCap = feeCap2
 	auth.From = fromAddr
+	auth.Nonce = nonce
 
 	tx, err := contract.Transfer(auth, toAddr, amount)
 	if err != nil {
+		fmt.Println("erc20 transfer err:", err)
 		return nil, err
 	}
+
+	fmt.Println("nonce", tx.Nonce(), "feecap", tx.GasFeeCap().String(), "tip", tx.GasTipCap().String())
 
 	return tx, nil
 }
