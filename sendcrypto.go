@@ -59,6 +59,7 @@ type Result struct {
 	TxPosition int
 	Nonce      uint64
 	Balance    float64
+	Data       string
 }
 
 type SendToManyResult struct {
@@ -73,7 +74,8 @@ type sendToManyResObj struct {
 	TxPosition int
 	Nonce      uint64
 	Balance    float64
-	err        error
+	Err        error
+	TxData     string
 }
 
 type SendToManyObj struct {
@@ -93,6 +95,7 @@ type CryptoSender struct {
 	balance           float64
 	nonce             uint64
 	awaitConfirmation bool
+	tipBoost          float64
 }
 
 func (c *CryptoSender) SetAPIKey(apiKey string) *CryptoSender {
@@ -113,6 +116,10 @@ func (c *CryptoSender) SetBalance(balance float64) *CryptoSender {
 }
 func (c *CryptoSender) SetNonce(nonce uint64) *CryptoSender {
 	c.nonce = nonce
+	return c
+}
+func (c *CryptoSender) SetTipBoost(tipBoost float64) *CryptoSender {
+	c.tipBoost = tipBoost
 	return c
 }
 func (c *CryptoSender) SetAwaitConfirmation(wait bool) *CryptoSender {
@@ -200,7 +207,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				res.Failed = append(res.Failed, &sendToManyResObj{
 					Address: addrVal.Address,
 					Amount:  addrVal.Amount,
-					err:     err,
+					Err:     err,
 				})
 				if addrVal.TerminateOnFail {
 					return res, err
@@ -212,6 +219,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				Amount:  addrVal.Amount,
 				Nonce:   result.Nonce,
 				TxHash:  result.TxHash,
+				TxData:  result.Data,
 			})
 			nonce = result.Nonce + 1
 		}
