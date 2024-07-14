@@ -68,6 +68,7 @@ type SendToManyResult struct {
 }
 
 type sendToManyResObj struct {
+	ID         string
 	Address    string
 	Amount     float64
 	TxHash     string
@@ -79,6 +80,7 @@ type sendToManyResObj struct {
 }
 
 type SendToManyObj struct {
+	ID              string
 	Address         string
 	Amount          float64
 	TerminateOnFail bool
@@ -191,6 +193,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				return nil, errors.New("invalid address found: " + addrVal.Address)
 			}
 			resList = append(resList, &sendToManyResObj{
+				ID:         addrVal.ID,
 				Address:    addrVal.Address,
 				Amount:     addrVal.Amount,
 				TxPosition: n + 1,
@@ -205,6 +208,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 			result, err := sender(ctx, c, privateKey, addrVal.Address, addrVal.Amount)
 			if err != nil {
 				res.Failed = append(res.Failed, &sendToManyResObj{
+					ID:      addrVal.ID,
 					Address: addrVal.Address,
 					Amount:  addrVal.Amount,
 					Err:     err,
@@ -215,6 +219,7 @@ func (c *CryptoSender) SendToMany(ctx context.Context, privateKey string, addrVa
 				continue
 			}
 			res.Success = append(res.Success, &sendToManyResObj{
+				ID:      addrVal.ID,
 				Address: addrVal.Address,
 				Amount:  addrVal.Amount,
 				Nonce:   result.Nonce,
